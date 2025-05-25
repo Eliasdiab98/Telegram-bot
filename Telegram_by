@@ -1,0 +1,45 @@
+import telegram
+from pytube import YouTube
+import instaloader
+import facebook_sdk
+
+# Replace with your Telegram bot token
+BOT_TOKEN = "YOUR_BOT_TOKEN"
+
+# Initialize bot
+bot = telegram.Bot(token=BOT_TOKEN)
+
+def handle_message(update, context):
+    chat_id = update.effective_chat.id
+    url = update.message.text
+
+    try:
+        if "youtube.com" in url:
+            yt = YouTube(url)
+            stream = yt.streams.get_highest_resolution()
+            stream.download()
+            bot.send_video(chat_id=chat_id, video=open(yt.title + ".mp4", "rb"))
+        elif "instagram.com" in url:
+            L = instaloader.Instaloader()
+            post = instaloader.Post.from_shortcode(L.context, url.split("/")[-2])
+            L.download_post(post, target=".")
+            bot.send_video(chat_id=chat_id, video=open(post.filename + ".mp4", "rb"))
+        elif "facebook.com" in url:
+            # Facebook SDK integration (replace with your app details)
+            facebook = facebook_sdk.GraphAPI(access_token="YOUR_ACCESS_TOKEN")
+            video = facebook.get_object(url)
+            # Download video using facebook_sdk and send to Telegram
+        else:
+            bot.send_message(chat_id=chat_id, text="Sorry, I can only download videos from YouTube, Instagram, and Facebook.")
+    except Exception as e:
+        bot.send_message(chat_id=chat_id, text=f"An error occurred: {e}")
+
+def main():
+    updater = telegram.ext.Updater(BOT_TOKEN, use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(telegram.ext.MessageHandler(telegram.ext.Filters.text, handle_message))
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
