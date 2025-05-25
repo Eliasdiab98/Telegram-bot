@@ -1,44 +1,68 @@
 import telegram
+from telegram.ext import Updater, MessageHandler, Filters
 from pytube import YouTube
 import instaloader
-import facebook_sdk
-
-# Replace with your Telegram bot token
-BOT_TOKEN = "7622262922:AAFwHuVM81DXQQsnBO1cTJpPFcaQHeSMSoM"
-# Initialize bot
-bot = telegram.Bot(token=BOT_TOKEN)
-
+import yt_dlp
+import os
+# استبدل 'YOUR_BOT_TOKEN' برمز البوت الخاص بك
+BOT_TOKEN = "7622262922:AAFwHuVM81DXQQsnBO1cTJpPFcaQHeSMSoM" # تأكد إن هذا التوكن صحيح
+# تهيئة البوت
+bot = telegram.Bot(token=7622262922:AAFwHuVM81DXQQsnBO1cTJpPFcaQHeSMSoM)
 def handle_message(update, context):
     chat_id = update.effective_chat.id
     url = update.message.text
-
     try:
-        if "youtube.com" in url:
+        if "youtube.com" in url or "youtu.be" in url:
+            context.bot.send_message(chat_id=chat_id, text="جاري تحميل الفيديو من يوتيوب...")
             yt = YouTube(url)
-            stream = yt.streams.get_highest_resolution()
-            stream.download()
-            bot.send_video(chat_id=chat_id, video=open(yt.title + ".mp4", "rb"))
+            stream = yt.streams.get_highest_resolution()            
+            # تحديد مسار مؤقت لحفظ الفيديو
+            # استخدام اسم ملف مؤقت لتجنب مشاكل الأسماء الطويلة أو الرموز
+            temp_filename = f"{yt.video_id}.mp4" 
+            stream.download(output_path='.', filename=temp_filename)     
+            # إرسال الفيديو بعد التحميل
+            with open(temp_filename, "rb") as video_file:
+                context.bot.send_video(chat_id=chat_id, video=video_file, caption=yt.title)
+            # حذف الملف المؤقت بعد الإرسال
+            os.remove(temp_filename)
         elif "instagram.com" in url:
-            L = instaloader.Instaloader()
+            context.bot.send_message(chat_id=chat_id, text="جاري تحميل الفيديو من إنستجرام...")
+            L = instaloader.Instaloader()        
+            # ملاحظة: instaloader قد تحتاج لتسجيل دخول. 
+            # يمكنك إضافة L.load_session_from_file("your_username", "your_username") 
+            # أو L.load_session_from_server("your_username") بعد تسجيل الدخول يدوياً مرة واحدة         
             post = instaloader.Post.from_shortcode(L.context, url.split("/")[-2])
-            L.download_post(post, target=".")
-            bot.send_video(chat_id=chat_id, video=open(post.filename + ".mp4", "rb"))
+            L.download_post(post, target='.')    
+            # البحث عن ملف الفيديو بعد التحميل
+            downloaded_files = [f for f in os.listdir('.') if f.endswith(('.mp4', '.MP4')) and post.shortcode in f]
+            if downloaded_files:
+                video_filename = downloaded_files[0]
+                with open(video_filename, "rb") as video_file:
+                    context.bot.send_video(chat_id=chat_id, video=video_file, caption=post.caption or "Instagram video")
+                os.remove(video_filename) # حذف الملف المؤقت
+            else:
+                context.bot.send_message(chat_id=chat_id, text="لم يتم العثور على الفيديو بعد التحميل من إنستجرام.")
         elif "facebook.com" in url:
-            # Facebook SDK integration (replace with your app details)
-            facebook = facebook_sdk.GraphAPI(access_token="YOUR_ACCESS_TOKEN")
-            video = facebook.get_object(url)
-            # Download video using facebook_sdk and send to Telegram
+            context.bot.send_message(chat_id=chat_id, text="جاري تحميل الفيديو من فيسبوك...")           
+            ydl_opts = {
+                'outtmpl': 'video.mp4', # اسم الملف المحمل
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])       
+            # إرسال الفيديو بعد التحميل
+            with open("video.mp4", "rb") as video_file:
+                context.bot.send_video(chat_id=chat_id, video=video_file, caption="Facebook video")    
+            # حذف الملف المؤقت بعد الإرسال
+            os.remove("video.mp4")
         else:
-            bot.send_message(chat_id=chat_id, text="Sorry, I can only download videos from YouTube, Instagram, and Facebook.")
+            context.bot.send_message(chat_id=chat_id, text="عذراً، لا أستطيع تحميل الفيديو من هذا الرابط. أنا أدعم يوتيوب وإنستجرام وفيسبوك حالياً.")
     except Exception as e:
-        bot.send_message(chat_id=chat_id, text=f"An error occurred: {e}")
-
+        context.bot.send_message(chat_id=chat_id, text=f"حدث خطأ: {e}")
 def main():
-    updater = telegram.ext.Updater(BOT_TOKEN, use_context=True)
+    updater = Updater(BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
-    dp.add_handler(telegram.ext.MessageHandler(telegram.ext.Filters.text, handle_message))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message)) # يستمع لكل الرسائل النصية ما عدا الأوامر
     updater.start_polling()
     updater.idle()
-
 if __name__ == '__main__':
     main()
