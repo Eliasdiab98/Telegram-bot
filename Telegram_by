@@ -4,7 +4,7 @@ import instaloader
 import facebook_sdk
 
 # Replace with your Telegram bot token
-BOT_TOKEN = "YOUR_BOT_TOKEN"
+BOT_TOKEN = "7622262922:AAFwHuVM81DXQQsnBO1cTJpPFcaQHeSMSoM"
 
 # Initialize bot
 bot = telegram.Bot(token=BOT_TOKEN)
